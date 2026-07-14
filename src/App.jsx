@@ -189,7 +189,7 @@ function seedDB() {
 const DB_KEY = "cardata-db-v1";
 
 // Siguron që baza e të dhënave e ruajtur (edhe nga versione të vjetra) të ketë të gjitha
-// fushat/tabelat që pret kodi i ri — parandalon crash-et gjatë shtimit të firmave/rezervimeve.
+// fushat/tabelat që pret kodi i ri �� parandalon crash-et gjatë shtimit të firmave/rezervimeve.
 function normalizeDB(db) {
   const base = db && typeof db === "object" ? db : {};
   const arrays = ["companies", "users", "vehicles", "clients", "reservations", "auditLog", "expenses", "coupons", "invoices"];
@@ -477,7 +477,17 @@ class ErrorBoundary extends React.Component {
 
 export default function CarDataApp() {
   const [db, setDb] = useState(null);
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState(() => {
+    try { const raw = sessionStorage.getItem("cardata-session"); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  });
+  const sessionRef = useRef(null);
+  useEffect(() => {
+    sessionRef.current = session;
+    try {
+      if (session) sessionStorage.setItem("cardata-session", JSON.stringify(session));
+      else sessionStorage.removeItem("cardata-session");
+    } catch (e) { /* ignore */ }
+  }, [session]);
   const [view, setView] = useState("dashboard");
   const [toasts, setToasts] = useState([]);
   useEffect(() => {
@@ -491,11 +501,17 @@ export default function CarDataApp() {
     let cancelled = false;
     (async () => {
       const remote = await fetchRemoteDB();
-      if (!cancelled && remote) {
-        const normalized = normalizeDB(remote);
-        saveDB(normalized);
-        setDb(normalized);
+      if (cancelled || !remote) return;
+      const normalized = normalizeDB(remote);
+      // Mos e mbivendos gjendjen lokale nëse përdoruesi i kyçur nuk gjendet te të dhënat e serverit
+      // (p.sh. firmë/përdorues i krijuar lokalisht që s'është sinkronizuar ende) — përndryshe do të dilte në login.
+      const sess = sessionRef.current;
+      if (sess && !normalized.users.some((u) => u.id === sess.userId)) {
+        pushRemoteDB(loadDB());
+        return;
       }
+      saveDB(normalized);
+      setDb(normalized);
     })();
     return () => { cancelled = true; };
   }, []);
