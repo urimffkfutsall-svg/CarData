@@ -189,7 +189,7 @@ function seedDB() {
 const DB_KEY = "cardata-db-v1";
 
 // Siguron që baza e të dhënave e ruajtur (edhe nga versione të vjetra) të ketë të gjitha
-// fushat/tabelat që pret kodi i ri �� parandalon crash-et gjatë shtimit të firmave/rezervimeve.
+// fushat/tabelat që pret kodi i ri ��� parandalon crash-et gjatë shtimit të firmave/rezervimeve.
 function normalizeDB(db) {
   const base = db && typeof db === "object" ? db : {};
   const arrays = ["companies", "users", "vehicles", "clients", "reservations", "auditLog", "expenses", "coupons", "invoices"];
@@ -1271,7 +1271,7 @@ function AdminForm({ data, companies, onSave, onCancel }) {
 
 function AuditLogPage({ db, currentUser, scopeAll }) {
   const [q, setQ] = useState("");
-  const logs = db.auditLog.filter((l) => scopeAll || l.companyId === currentUser.companyId);
+  const logs = db.auditLog.filter((l) => scopeAll || (l.companyId === currentUser.companyId && l.role !== "superadmin"));
   const filtered = logs.filter((l) => {
     const s = q.toLowerCase();
     return !s || (l.action || "").toLowerCase().includes(s) || (l.userName || "").toLowerCase().includes(s) || (l.details || "").toLowerCase().includes(s);
@@ -1844,6 +1844,7 @@ function ReservationsPage({ db, currentCompany, currentUser, persist, logAction,
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(null);
   const [confirmCancel, setConfirmCancel] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
   const perPage = 8;
 
   const cid = currentCompany.id;
@@ -1893,6 +1894,20 @@ function ReservationsPage({ db, currentCompany, currentUser, persist, logAction,
     notify(`Statusi u ndryshua në "${STATUS_META[status].label}".`);
   };
 
+  const doDelete = () => {
+    const r = confirmDel;
+    persist((p) => ({
+      ...p,
+      reservations: p.reservations.filter((x) => x.id !== r.id),
+      vehicles: ["active", "confirmed", "reserved"].includes(r.status)
+        ? p.vehicles.map((v) => (v.id === r.vehicleId ? { ...v, status: "free" } : v))
+        : p.vehicles,
+    }));
+    logAction("Rezervim u fshi", `#${r.num}`);
+    notify("Rezervimi u fshi.");
+    setConfirmDel(null);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1933,6 +1948,7 @@ function ReservationsPage({ db, currentCompany, currentUser, persist, logAction,
                       {r.status === "confirmed" ? <button onClick={() => setStatus(r, "active")} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-red-100 text-red-700">Marrje</button> : null}
                       {r.status === "active" ? <button onClick={() => setStatus(r, "completed")} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-700">Kthim</button> : null}
                       {["pending", "confirmed"].includes(r.status) ? <button onClick={() => setConfirmCancel(r)} className="px-2 py-1 rounded-md text-[11px] font-semibold bg-neutral-100 text-neutral-600">Anulo</button> : null}
+                      <button onClick={() => setConfirmDel(r)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="Fshi"><Trash2 size={13} /></button>
                     </div>
                   </td>
                 </tr>
@@ -1947,6 +1963,7 @@ function ReservationsPage({ db, currentCompany, currentUser, persist, logAction,
         {modal ? <ReservationForm data={modal.data} clients={clients} vehicles={vehicles} coupons={db.coupons.filter((c) => c.companyId === cid)} reservations={db.reservations.filter((r) => r.companyId === cid)} onSave={save} onCancel={() => setModal(null)} onAddClient={(client) => { const c = { ...client, id: uid("c"), companyId: cid }; persist((p) => ({ ...p, clients: [c, ...p.clients] })); logAction("Klient u shtua nga rezervimi", `${c.firstName} ${c.lastName}`); notify("Klienti u shtua."); return c.id; }} /> : null}
       </Modal>
       <ConfirmDialog open={!!confirmCancel} title="Anulo rezervimin?" message={`Rezervimi #${confirmCancel?.num} do të shënohet si i anuluar.`} danger onConfirm={() => { setStatus(confirmCancel, "cancelled"); setConfirmCancel(null); }} onCancel={() => setConfirmCancel(null)} />
+      <ConfirmDialog open={!!confirmDel} title="Fshi rezervimin?" message={`Rezervimi #${confirmDel?.num} do të fshihet përfundimisht.`} danger onConfirm={doDelete} onCancel={() => setConfirmDel(null)} />
     </div>
   );
 }
