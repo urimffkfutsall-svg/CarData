@@ -61,12 +61,27 @@ npm install --save-dev electron@^31 electron-builder@^24 cross-env@^7
 npm run dist:win   # krijon dist_installer/CarData Setup 0.1.0.exe
 ```
 
-## 7) Emri automatik nga nën-domaini
-| Domaini | Emri që shfaqet |
+## 7) Subdomaini i secilës firmë (multi-tenant)
+Gjatë krijimit të një firme, superadmini vendos një **Identifikues (subdomain)** — p.sh. `rentacarspahija`. Ky gjenerohet automatikisht nga emri, por mund të ndryshohet dhe duhet të jetë unik.
+
+Kur hapet `rentacarspahija.datapos.pro`:
+- Emri i firmës shfaqet automatikisht në login dhe në tab-in e shfletë.
+- **Vetëm kredencialet e asaj firme** (dhe superadmini) mund të kyqen. Nëse dikush provon me kredencialet e një firme tjetër, bllokohet.
+
+| Domaini | çfarë ndodh |
 |---|---|
-| `rentacarspahija.datapos.pro` | **Rent a Car Spahija** |
-| `autorent.datapos.pro` | **Autorent** |
-| `localhost` (dev) | **CarData** |
+| `rentacarspahija.datapos.pro` | Login vetëm për firmën **Rent a Car Spahija** |
+| `autorent.datapos.pro` | Login vetëm për firmën **AutoRent** |
+| `localhost` (dev) | Login i përgjithshëm (të gjitha firmat) |
+
+### Konfigurimi i domainit (një herë)
+Që çdo subdomain (`*.datapos.pro`) të hapet automatikisht pa e shtuar një nga një:
+1. **Namecheap → Advanced DNS** te `datapos.pro`, shto një rekord:
+   - **Type:** `CNAME` · **Host:** `*` · **Value:** `cname.vercel-dns.com`
+2. **Vercel → Project → Settings → Domains**, shto domainin **`*.datapos.pro`** (wildcard).
+3. Prit propagimin e DNS (zakonisht disa minuta).
+
+Pas kësaj, sapo të krijosh një firmë me subdomain `rentacarspahija`, adresa `rentacarspahija.datapos.pro` funksionon menjëherë — pa ndryshime të tjera në kod.
 
 ## Teknologjitë
 React 18 · Vite 5 · Tailwind CSS 3 · lucide-react · PWA · Vercel Serverless + KV · Electron (opsional)

@@ -128,9 +128,9 @@ const PAY_STATUS_META = {
 
 function seedDB() {
   const companies = [
-    { id: "co_1", name: "AutoRent Prishtina", owner: "Fatmir Krasniqi", phone: "+383 44 111 222", email: "info@autorent-pr.com", address: "Rr. Nëna Terezë 12", city: "Prishtinë", taxNo: "810234567", status: "active", plan: "Vjetor", subStart: "2026-01-01", subEnd: "2026-12-31", createdAt: "2026-01-01" },
-    { id: "co_2", name: "GjilanCars", owner: "Blerta Hoxha", phone: "+383 44 333 444", email: "contact@gjilancars.com", address: "Rr. Bulevardi 5", city: "Gjilan", taxNo: "810987654", status: "active", plan: "3-mujor", subStart: "2026-05-15", subEnd: "2026-08-15", createdAt: "2026-05-15" },
-    { id: "co_3", name: "PejaDrive Rent a Car", owner: "Arben Gashi", phone: "+383 44 555 666", email: "hello@pejadrive.com", address: "Rr. Kryesore 20", city: "Pejë", taxNo: "810112233", status: "inactive", plan: "Mujor", subStart: "2026-06-01", subEnd: "2026-07-01", createdAt: "2026-06-01" },
+    { id: "co_1", name: "AutoRent Prishtina", subdomain: "autorent", owner: "Fatmir Krasniqi", phone: "+383 44 111 222", email: "info@autorent-pr.com", address: "Rr. Nëna Terezë 12", city: "Prishtinë", taxNo: "810234567", status: "active", plan: "Vjetor", subStart: "2026-01-01", subEnd: "2026-12-31", createdAt: "2026-01-01" },
+    { id: "co_2", name: "GjilanCars", subdomain: "gjilancars", owner: "Blerta Hoxha", phone: "+383 44 333 444", email: "contact@gjilancars.com", address: "Rr. Bulevardi 5", city: "Gjilan", taxNo: "810987654", status: "active", plan: "3-mujor", subStart: "2026-05-15", subEnd: "2026-08-15", createdAt: "2026-05-15" },
+    { id: "co_3", name: "PejaDrive Rent a Car", subdomain: "pejadrive", owner: "Arben Gashi", phone: "+383 44 555 666", email: "hello@pejadrive.com", address: "Rr. Kryesore 20", city: "Pejë", taxNo: "810112233", status: "inactive", plan: "Mujor", subStart: "2026-06-01", subEnd: "2026-07-01", createdAt: "2026-06-01" },
   ];
 
   const users = [
@@ -423,6 +423,35 @@ function getBrandFromHost() {
 const BRAND = getBrandFromHost();
 const APP_NAME = BRAND || "CarData";
 
+// --- Subdomain scoping: qdo firmë ka subdomainin e vet (p.sh. rentacarspahija.datapos.pro) ---
+function slugify(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 40);
+}
+function getSubdomainSlug() {
+  try {
+    const host = (window.location.hostname || "").toLowerCase();
+    if (!host || host === "localhost" || /^(\d{1,3}\.){3}\d{1,3}$/.test(host)) return null;
+    const parts = host.split(".");
+    if (parts.length >= 3) {
+      const sub = parts[0];
+      if (sub && sub !== "www") return sub;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+const SUBDOMAIN = getSubdomainSlug();
+function companyForSubdomain(companies) {
+  if (!SUBDOMAIN || !Array.isArray(companies)) return null;
+  return companies.find((c) => slugify(c.subdomain || c.name) === SUBDOMAIN) || null;
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(error) { return { error }; }
@@ -452,8 +481,9 @@ export default function CarDataApp() {
   const [view, setView] = useState("dashboard");
   const [toasts, setToasts] = useState([]);
   useEffect(() => {
-    document.title = APP_NAME + " — Menaxhim Rent a Car";
-  }, []);
+    const sc = SUBDOMAIN && db ? db.companies.find((c) => slugify(c.subdomain || c.name) === SUBDOMAIN) : null;
+    document.title = (sc ? sc.name : APP_NAME) + " — Menaxhim Rent a Car";
+  }, [db]);
 
   useEffect(() => {
     // Shfaq menjëherë të dhënat lokale, pastaj hidrato nga serveri (Vercel KV) nëse është i disponueshëm.
@@ -546,12 +576,14 @@ function LoginPage({ db, onLogin, notify }) {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [err, setErr] = useState("");
+  const scopedCompany = companyForSubdomain(db.companies);
 
   const submit = (e) => {
     e.preventDefault();
     const u = db.users.find((x) => x.username.toLowerCase() === username.trim().toLowerCase());
     if (!u || u.password !== password) { setErr("Username ose password i pasaktë."); return; }
     if (!u.active) { setErr("Ky përdorues është çaktivizuar."); return; }
+    if (scopedCompany && u.role !== "superadmin" && u.companyId !== scopedCompany.id) { setErr(`Këto kredenciale nuk i përkasin firmës ${scopedCompany.name}.`); return; }
     if (u.companyId) {
       const co = db.companies.find((c) => c.id === u.companyId);
       if (co && co.status !== "active") { setErr("Firma juaj është joaktive. Kontaktoni administratorin e sistemit."); return; }
@@ -579,11 +611,11 @@ function LoginPage({ db, onLogin, notify }) {
         <div className="p-8 sm:p-10 flex flex-col">
           <div className="flex items-center gap-2 mb-10">
             <div className="w-10 h-10 rounded-xl bg-neutral-900 flex items-center justify-center"><Car size={20} className="text-red-500" /></div>
-            <span className="display text-2xl font-bold tracking-tight">{BRAND ? BRAND : (<>Car<span className="text-red-600">Data</span></>)}</span>
+            <span className="display text-2xl font-bold tracking-tight">{scopedCompany ? scopedCompany.name : BRAND ? BRAND : (<>Car<span className="text-red-600">Data</span></>)}</span>
           </div>
           <div className="flex-1">
             <h2 className="display text-3xl font-bold mb-1">Hyr në llogari</h2>
-            <p className="text-sm text-neutral-500 mb-6">Menaxho firmën tënde të Rent a Car me një platformë të vetme.</p>
+            <p className="text-sm text-neutral-500 mb-6">{scopedCompany ? `Hyr në llogarinë e firmës ${scopedCompany.name}.` : "Menaxho firmën tënde të Rent a Car me një platformë të vetme."}</p>
             {err ? <div className="mb-4 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</div> : null}
             <form onSubmit={submit}>
               <Field label="Username" required>
@@ -844,7 +876,7 @@ function SADashboard({ db, setView }) {
 
 /* ============================== Superadmin: Companies ============================== */
 
-const emptyCompany = { name: "", owner: "", phone: "", email: "", address: "", city: "", taxNo: "", status: "active", plan: "Mujor", subStart: todayISO(), subEnd: addDays(todayISO(), 30), logo: "", adminName: "", adminUsername: "", adminPassword: "admin123" };
+const emptyCompany = { name: "", subdomain: "", owner: "", phone: "", email: "", address: "", city: "", taxNo: "", status: "active", plan: "Mujor", subStart: todayISO(), subEnd: addDays(todayISO(), 30), logo: "", adminName: "", adminUsername: "", adminPassword: "admin123" };
 
 function readFileAsDataURL(file, maxSize = 500000) {
   return new Promise((resolve, reject) => {
@@ -874,7 +906,10 @@ function CompaniesPage({ db, persist, logAction, notify }) {
   const save = (data) => {
     if (modal.mode === "new") {
       const { adminName, adminUsername, adminPassword, ...companyData } = data;
-      const co = { ...companyData, id: uid("co"), createdAt: todayISO() };
+      const sub = slugify(companyData.subdomain || companyData.name);
+      if (!sub) { notify("Vendos një identifikues (subdomain) të vlefshëm!", "error"); return; }
+      if (db.companies.some((c) => slugify(c.subdomain || c.name) === sub)) { notify(`Subdomaini "${sub}" është i zënë nga një firmë tjetër!`, "error"); return; }
+      const co = { ...companyData, subdomain: sub, id: uid("co"), createdAt: todayISO() };
       const newUsers = [];
       if (adminUsername && adminName) {
         const dup = db.users.some((u) => u.username.toLowerCase() === adminUsername.trim().toLowerCase());
@@ -886,7 +921,9 @@ function CompaniesPage({ db, persist, logAction, notify }) {
       if (newUsers.length) logAction("Administrator i firmës u krijua", `${newUsers[0].name} (${newUsers[0].username})`, co.id);
       notify(newUsers.length ? "Firma dhe administratori u shtuan me sukses." : "Firma u shtua me sukses.");
     } else {
-      persist((p) => ({ ...p, companies: p.companies.map((c) => (c.id === data.id ? data : c)) }));
+      const sub = slugify(data.subdomain || data.name);
+      if (sub && db.companies.some((c) => c.id !== data.id && slugify(c.subdomain || c.name) === sub)) { notify(`Subdomaini "${sub}" është i zënë nga një firmë tjetër!`, "error"); return; }
+      persist((p) => ({ ...p, companies: p.companies.map((c) => (c.id === data.id ? { ...data, subdomain: sub } : c)) }));
       logAction("Firma u editua", data.name, data.id);
       notify("Firma u përditësua.");
     }
@@ -966,7 +1003,10 @@ function CompaniesPage({ db, persist, logAction, notify }) {
 function CompanyForm({ data, mode, onSave, onCancel }) {
   const [f, setF] = useState(data);
   const [logoErr, setLogoErr] = useState("");
+  const [subTouched, setSubTouched] = useState(Boolean(data && data.subdomain));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const setName = (e) => { const name = e.target.value; setF((prev) => ({ ...prev, name, subdomain: subTouched ? prev.subdomain : slugify(name) })); };
+  const setSubdomain = (e) => { setSubTouched(true); setF((prev) => ({ ...prev, subdomain: slugify(e.target.value) })); };
   const isNew = mode === "new";
   const handleLogo = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -979,7 +1019,7 @@ function CompanyForm({ data, mode, onSave, onCancel }) {
     } catch (er) { setLogoErr(er.message || "Gabim gjatë ngarkimit"); }
   };
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (!f.name || !f.owner) return; if (isNew && (!f.adminName || !f.adminUsername)) return; onSave(f); }}>
+    <form onSubmit={(e) => { e.preventDefault(); if (!f.name || !f.owner || !f.subdomain) return; if (isNew && (!f.adminName || !f.adminUsername)) return; onSave({ ...f, subdomain: slugify(f.subdomain) }); }}>
       <div className="flex items-center gap-4 mb-4 pb-4 border-b border-neutral-100">
         {f.logo ? (
           <img src={f.logo} alt="logo" className="w-20 h-20 rounded-xl object-cover border border-neutral-200 bg-white" />
@@ -1002,7 +1042,14 @@ function CompanyForm({ data, mode, onSave, onCancel }) {
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-x-4">
-        <Field label="Emri i firmës" required><input value={f.name} onChange={set("name")} className={inputCls} required /></Field>
+        <Field label="Identifikuesi (subdomain)" required>
+          <div className="flex items-center rounded-lg border border-neutral-300 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-red-500/40">
+            <input value={f.subdomain} onChange={setSubdomain} className="flex-1 px-3 py-2 text-sm outline-none" required placeholder="p.sh. rentacarspahija" />
+            <span className="px-2.5 py-2 text-xs text-neutral-400 bg-neutral-50 border-l border-neutral-200 whitespace-nowrap">.datapos.pro</span>
+          </div>
+          <div className="text-[10px] text-neutral-400 mt-1">Domaini i firmës: <span className="font-semibold text-neutral-600">{(f.subdomain ? slugify(f.subdomain) : "firma")}.datapos.pro</span></div>
+        </Field>
+        <Field label="Emri i firmës" required><input value={f.name} onChange={setName} className={inputCls} required placeholder="p.sh. Rent a Car Spahija" /></Field>
         <Field label="Pronari / Personi përgjegjës" required><input value={f.owner} onChange={set("owner")} className={inputCls} required /></Field>
         <Field label="Telefoni"><input value={f.phone} onChange={set("phone")} className={inputCls} /></Field>
         <Field label="Email"><input type="email" value={f.email} onChange={set("email")} className={inputCls} /></Field>
