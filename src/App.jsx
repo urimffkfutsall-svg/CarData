@@ -189,7 +189,7 @@ function seedDB() {
 const DB_KEY = "cardata-db-v1";
 
 // Siguron që baza e të dhënave e ruajtur (edhe nga versione të vjetra) të ketë të gjitha
-// fushat/tabelat që pret kodi i ri ��� parandalon crash-et gjatë shtimit të firmave/rezervimeve.
+// fushat/tabelat që pret kodi i ri ���� parandalon crash-et gjatë shtimit të firmave/rezervimeve.
 function normalizeDB(db) {
   const base = db && typeof db === "object" ? db : {};
   const arrays = ["companies", "users", "vehicles", "clients", "reservations", "auditLog", "expenses", "coupons", "invoices"];
@@ -565,9 +565,10 @@ export default function CarDataApp() {
     <>
       <div className="min-h-screen bg-neutral-100 flex text-neutral-900">
         <Sidebar role={currentUser.role} view={view} setView={setView} company={currentCompany} onLogout={() => { setSession(null); }} />
+        <BottomNav role={currentUser.role} view={view} setView={setView} company={currentCompany} onLogout={() => { setSession(null); }} />
         <div className="flex-1 min-w-0 flex flex-col">
           <Topbar user={currentUser} company={currentCompany} />
-          <main className="flex-1 p-4 sm:p-6 overflow-x-hidden">
+          <main className="flex-1 p-4 sm:p-6 pb-24 sm:pb-6 overflow-x-hidden">
             <ErrorBoundary key={view}>
               <PageRouter
                 view={view} setView={setView}
@@ -624,7 +625,7 @@ function LoginPage({ db, onLogin, notify }) {
     <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-4">
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden grid md:grid-cols-2">
         {/* Left: form */}
-        <div className="p-8 sm:p-10 flex flex-col">
+        <div className="p-6 sm:p-10 flex flex-col">
           <div className="flex items-center gap-2 mb-10">
             <div className="w-10 h-10 rounded-xl bg-neutral-900 flex items-center justify-center"><Car size={20} className="text-red-500" /></div>
             <span className="display text-2xl font-bold tracking-tight">{scopedCompany ? scopedCompany.name : BRAND ? BRAND : (<>Car<span className="text-red-600">Data</span></>)}</span>
@@ -698,13 +699,8 @@ function LoginPage({ db, onLogin, notify }) {
 
 function Sidebar({ role, view, setView, company, onLogout }) {
   const items = NAV[role] || [];
-  const [open, setOpen] = useState(false);
   return (
-    <>
-      <button className="no-print sm:hidden fixed top-3 left-3 z-40 ink-gradient text-white p-2 rounded-xl shadow-lg" onClick={() => setOpen((o) => !o)}>
-        <Menu size={18} />
-      </button>
-      <aside className={`no-print ink-gradient text-neutral-300 w-64 shrink-0 flex flex-col fixed sm:static inset-y-0 left-0 z-30 transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full sm:translate-x-0"}`}>
+    <aside className="no-print ink-gradient text-neutral-300 w-64 shrink-0 hidden sm:flex flex-col sticky top-0 h-screen">
         <div className="flex items-center gap-2.5 px-5 py-5">
           <div className="w-9 h-9 rounded-xl brand-gradient flex items-center justify-center shadow-lg shadow-red-900/40"><Car size={18} className="text-white" /></div>
           <span className="display font-bold text-white text-lg tracking-tight">{BRAND ? BRAND : (<>Car<span className="text-red-500">Data</span></>)}</span>
@@ -729,7 +725,7 @@ function Sidebar({ role, view, setView, company, onLogout }) {
             return (
               <button
                 key={it.id}
-                onClick={() => { setView(it.id); setOpen(false); }}
+                onClick={() => setView(it.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${active ? "brand-gradient text-white shadow-lg shadow-red-900/30" : "text-neutral-400 hover:text-white hover:bg-white/5"}`}
               >
                 <Icon size={17} />{it.label}
@@ -740,8 +736,64 @@ function Sidebar({ role, view, setView, company, onLogout }) {
         <button onClick={onLogout} className="flex items-center gap-3 mx-3 mb-3 px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-400 hover:text-white hover:bg-red-600/20 transition">
           <LogOut size={17} /> Dilni
         </button>
-      </aside>
-      {open ? <div className="no-print sm:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-20" onClick={() => setOpen(false)} /> : null}
+    </aside>
+  );
+}
+
+function BottomNav({ role, view, setView, onLogout, company }) {
+  const items = NAV[role] || [];
+  const [moreOpen, setMoreOpen] = useState(false);
+  const primary = items.slice(0, 4);
+  const rest = items.slice(4);
+  return (
+    <>
+      <nav className="no-print sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t hairline shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-stretch px-1 pb-[env(safe-area-inset-bottom)]">
+        {primary.map((it) => {
+          const Icon = it.icon;
+          const active = view === it.id;
+          return (
+            <button key={it.id} onClick={() => { setView(it.id); setMoreOpen(false); }} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 min-w-0 ${active ? "text-red-600" : "text-neutral-400"}`}>
+              <span className={`flex items-center justify-center w-10 h-7 rounded-full transition-colors ${active ? "bg-red-50" : ""}`}><Icon size={19} /></span>
+              <span className="text-[10px] font-semibold truncate max-w-full px-0.5">{it.label}</span>
+            </button>
+          );
+        })}
+        {rest.length ? (
+          <button onClick={() => setMoreOpen(true)} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 ${moreOpen ? "text-red-600" : "text-neutral-400"}`}>
+            <span className={`flex items-center justify-center w-10 h-7 rounded-full ${moreOpen ? "bg-red-50" : ""}`}><Menu size={19} /></span>
+            <span className="text-[10px] font-semibold">Më shumë</span>
+          </button>
+        ) : null}
+      </nav>
+      {moreOpen ? (
+        <div className="no-print sm:hidden fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMoreOpen(false)} />
+          <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-2xl max-h-[78vh] overflow-y-auto animate-slide-in pb-[env(safe-area-inset-bottom)]">
+            <div className="flex items-center justify-between px-5 py-4 border-b hairline sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl brand-gradient flex items-center justify-center shrink-0"><Car size={18} className="text-white" /></div>
+                <span className="display font-bold text-lg truncate">{company ? company.name : (BRAND || "CarData")}</span>
+              </div>
+              <button onClick={() => setMoreOpen(false)} className="p-1.5 rounded-lg hover:bg-neutral-100"><X size={18} /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 p-4">
+              {items.map((it) => {
+                const Icon = it.icon;
+                const active = view === it.id;
+                return (
+                  <button key={it.id} onClick={() => { setView(it.id); setMoreOpen(false); }} className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border text-center ${active ? "brand-gradient text-white border-transparent shadow-lg shadow-red-900/20" : "bg-neutral-50 border-neutral-100 text-neutral-600"}`}>
+                    <Icon size={20} />
+                    <span className="text-[11px] font-semibold leading-tight px-1">{it.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="px-4 pb-5">
+              <button onClick={() => { setMoreOpen(false); onLogout(); }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 text-red-600 font-semibold text-sm"><LogOut size={16} />Dilni</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -750,8 +802,8 @@ function Topbar({ user, company }) {
   const roleLabel = { superadmin: "Superadministrator", admin: "Administrator Firme", employee: "Punëtor" }[user.role];
   return (
     <header className="no-print glass border-b hairline px-5 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-20">
-      <div className="pl-9 sm:pl-0">
-        <div className="text-sm font-semibold text-neutral-900">{user.name}</div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-neutral-900 truncate">{user.name}</div>
         <div className="text-[11px] text-neutral-500">{roleLabel}{company ? ` · ${company.name}` : ""}</div>
       </div>
       <div className="flex items-center gap-3">
@@ -3030,7 +3082,7 @@ function Chatbot({ company, setView, role }) {
   };
 
   return (
-    <div className="no-print fixed bottom-5 right-5 z-[70] flex flex-col items-end">
+    <div className="no-print fixed bottom-20 right-4 sm:bottom-5 sm:right-5 z-[70] flex flex-col items-end">
       {open ? (
         <div className="mb-3 w-[340px] max-w-[calc(100vw-2.5rem)] card overflow-hidden animate-slide-in">
           <div className="ink-gradient text-white px-4 py-3 flex items-center justify-between">
