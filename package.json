@@ -22,6 +22,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "vite": "^5.4.11"
@@ -29,10 +32,17 @@
   "build": {
     "appId": "pro.datapos.cardata",
     "productName": "CarData",
-    "directories": { "output": "dist_installer" },
-    "files": ["dist/**/*", "electron/**/*"],
+    "directories": {
+      "output": "dist_installer"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
